@@ -8,7 +8,7 @@ root = Path(__file__).resolve().parents[1]
 output = root / "dist" / "aai-poker-internship.zip"
 output.parent.mkdir(exist_ok=True)
 excluded = {
-    "node_modules", ".next", ".venv", "__pycache__", ".pytest_cache",
+    ".git", "node_modules", ".next", ".venv", "__pycache__", ".pytest_cache",
     ".ruff_cache", "coverage", "playwright-report", "test-results", "dist",
 }
 count = 0
