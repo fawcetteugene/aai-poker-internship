@@ -132,7 +132,18 @@ python3 scripts/package_submission.py
 
 ## AI-use disclosure
 
-AI assistance was used throughout design, implementation, testing, and documentation. The repository includes the visible conversation export and a tool/model disclosure in [docs/ai/](docs/ai/). The implementation, tests, and verification results should be reviewed by the applicant before submission.
+AI assistance was used throughout design, implementation, testing, and documentation. The visible conversation export and tool/model disclosure are included in [docs/ai/](docs/ai/).
+
+### Tools and use
+
+- **OpenAI Codex:** explored the exercise requirements, planned the architecture, implemented frontend and backend code, refined the UI, wrote tests and documentation, and ran verification commands.
+- **Next.js, React, TypeScript, shadcn/ui, and Tailwind:** built the single-page browser interface and its responsive design system.
+- **Python, FastAPI, Poetry, and Ruff:** implemented the API, validation layer, repository boundary, dependency management, and linting.
+- **PokerKit:** replayed validated action transcripts and calculated winnings, side pots, split pots, and chip settlement.
+- **PostgreSQL and raw SQL:** persisted completed hand snapshots through the repository class.
+- **Docker Compose:** started and health-checked the PostgreSQL, backend, frontend, and integration-test services.
+- **Node test runner and Playwright:** verified game rules, cross-language transcript parity, API persistence, save retries, and mobile layout behavior.
+- **Git and GitHub CLI:** versioned the source, created the repository, and published the reviewed project.
 
 ## Scope
 
