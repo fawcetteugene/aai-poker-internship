@@ -1,118 +1,139 @@
-# Six Hand — AAI Labs poker exercise
+# Six Hand
 
-A single-page, six-player no-limit Texas Hold’em simulator. One user controls all six seats. The browser runs the hand; FastAPI replays the completed transcript with PokerKit, calculates winnings, and saves it to PostgreSQL.
+A six-player, single-page Texas Hold’em simulator built for the AAI Labs Member of Technical Staff (Software) internship exercise.
 
-## Run
+Six Hand lets one user operate all six seats through a complete no-limit Hold’em hand. The browser owns the interactive betting state, FastAPI validates and settles the completed transcript with PokerKit, and PostgreSQL stores the resulting hand history.
 
-From the repository root, with Docker and Docker Compose installed:
+## Highlights
+
+- Six-player Texas Hold’em with fixed positions, 20/40 blinds, and no ante.
+- Complete action flow: fold, check, call, bet, raise, and all-in.
+- Legal actions and wager bounds calculated by a pure client-side game engine.
+- Live play log, community-card reveals, settlement details, and persistent hand history.
+- Server-side replay and validation through PokerKit, including winnings, side pots, split pots, and chip conservation.
+- REST API backed by PostgreSQL through a raw-SQL repository class.
+- Responsive React interface styled with shadcn/ui and Tailwind.
+- Docker Compose startup from the repository root with no setup file required.
+
+## Run the application
+
+Requirements: Docker and Docker Compose.
+
+From the repository root:
 
 ```bash
 docker compose up -d
 ```
 
-Open **http://localhost:3000**. The first run builds the images and downloads dependencies. No environment file, database setup, or other configuration is required. Health checks order startup so the database and API are ready before the frontend starts. API documentation is at http://localhost:8000/docs.
+Open the application at [http://localhost:3000](http://localhost:3000). FastAPI’s interactive documentation is available at [http://localhost:8000/docs](http://localhost:8000/docs).
+
+Useful commands:
 
 ```bash
-docker compose ps                 # all three application services should be healthy
-docker compose logs backend       # inspect API startup or errors
-docker compose down               # stop; saved hands remain in the named volume
+docker compose ps
+docker compose logs backend
+docker compose down
 ```
 
-The database password in Compose is a local development default. Services are exposed on loopback only; PostgreSQL is internal to the Compose network.
+The PostgreSQL data is stored in the named `poker_data` volume. The services bind to loopback addresses for local development.
 
-## Play
+## How to play
 
-1. Choose a starting stack for all six players and click **Apply**. If a hand is in progress, Apply starts it again with the new stack.
-2. Click **Start** to deal. The first action changes this button to **Reset**.
-3. Act for the highlighted player. Illegal actions are disabled. The amount input is the **total street contribution** for a bet/raise; the minus and plus buttons change it by exactly 40 chips. All-in handles the remaining stack, including amounts outside that increment.
-4. The board advances when a betting round closes. When no further betting is possible, the remaining board runs out automatically.
-5. A completed hand is automatically validated and saved. The history panel fetches saved hands from the API and survives refreshes. A failed save offers **Retry save** and keeps Reset disabled until saving succeeds.
+1. Enter a starting stack for each player and select **Apply**.
+2. Select **Start** to deal a new hand. The button becomes **Reset** after the first action.
+3. Follow the highlighted seat and select a legal action. Bet and raise amounts represent the total street contribution; the plus and minus controls move in 40-chip big-blind increments.
+4. The board advances automatically when a betting round closes. If no further betting is possible, the remaining board runs out automatically.
+5. When the hand completes, the browser submits the transcript. The server validates it, calculates winnings, saves it, and refreshes the hand history.
 
-Each independent hand has fixed positions: Player 1 is small blind (20), Player 2 is big blind (40), Player 6 is dealer. There is no ante or rake. All players’ hole cards are visible because this is a simulator for one user controlling every seat. Reset deals a fresh deck and restores the configured stacks. Starting stacks must be whole numbers from 40 to 1,000,000.
+Player 1 is the small blind, Player 2 is the big blind, and Player 6 is the dealer. Starting stacks must be whole numbers from 40 to 1,000,000 chips. All hole cards are visible because this is a six-seat simulator operated by one user.
 
-## Repository
+## Architecture
 
-```text
-frontend/
-  src/lib/poker.ts          Pure, immutable client betting engine
-  src/lib/api.ts            REST client
-  src/components/           React interface and generated shadcn/ui components
-  tests/                    Betting rules and cross-language transcript tests
-  e2e/                      Playwright tests against the real Compose stack
-backend/
-  main.py                   Development entry point
-  pyproject.toml            Poetry project definition
-  poetry.lock               Locked Python dependencies
-  src/poker/
-    models.py               Dataclass persistence entities
-    schemas.py              Strict request validation
-    engine.py               PokerKit replay and settlement
-    repository.py           Parameterized raw SQL and dataclass reconstruction
-    api.py                  FastAPI routes and connection-pool lifecycle
-  tests/                    Domain, HTTP, and PostgreSQL integration tests
-docs/
-  architecture.md           Design decisions and code walkthrough
-  verification.md           Recorded validation results
-  ai/                       AI disclosure and conversation export
-  reference/                Original private exercise and wireframe
-```
+The project is organized as a single repository with separate frontend and backend applications.
 
-The backend follows the requested template’s `main.py`, `src/`, `tests/`, `pyproject.toml`, and Dockerfile layout, with a named package inside `src/`. The referenced template currently uses uv; this submission uses **Poetry**, as explicitly required by the exercise. The frontend uses Next.js, React, TypeScript, Tailwind, and shadcn/ui components generated from the official registry.
+- **Frontend:** Next.js, React, TypeScript, shadcn/ui, Tailwind, and Playwright.
+- **Client game engine:** `frontend/src/lib/poker.ts` contains immutable state transitions, legal-action calculation, betting-round progression, board reveals, and chip accounting.
+- **API client:** `frontend/src/lib/api.ts` uses same-origin `/api/*` requests. Next.js rewrites those requests to FastAPI inside the Compose network.
+- **Backend:** FastAPI validates request schemas, replays actions through PokerKit, calculates trusted payoffs, and exposes hand resources.
+- **Persistence:** `backend/src/poker/repository.py` uses parameterized raw SQL and PostgreSQL JSONB. Dataclass entities represent stored hands.
+- **Startup:** PostgreSQL becomes healthy before FastAPI starts; the frontend waits for the API health check.
+
+## API
+
+| Method | Resource | Description |
+| --- | --- | --- |
+| `GET` | `/health` | Readiness check with a database query. |
+| `GET` | `/api/hands?limit=50&offset=0` | Returns newest completed hands first. |
+| `GET` | `/api/hands/{uuid}` | Returns one saved hand or `404`. |
+| `POST` | `/api/hands` | Validates, settles, and persists a completed hand. Returns `201` with `Location`. |
+
+The server never accepts client-supplied winnings. It validates cards, action order, legal betting, completion, and chip conservation before persistence. Repeating an identical hand UUID is idempotent; reusing it for different content returns `409`.
 
 ## Verification
 
-Backend tests, including a real PostgreSQL repository test, run entirely through Docker:
+Run the backend and PostgreSQL integration suite through Docker:
 
 ```bash
 docker compose --profile test run --build --rm tests
 ```
 
-For frontend unit/contract tests and browser tests, install Node.js 24 and Python 3.12 with Poetry:
+Run the frontend checks locally from `frontend/`:
 
 ```bash
-cd backend
-poetry install
-poetry run pytest
-poetry run ruff check src tests main.py
-cd ../frontend
 npm ci
 npm run typecheck
 npm test
-npx playwright install chromium
 npm run test:e2e
 ```
 
-The browser tests expect the Compose stack on port 3000. Set `PLAYWRIGHT_BASE_URL` to test another local URL. The cross-language test uses `backend/.venv/bin/python`; set `POKER_PYTHON` if Poetry created its environment elsewhere. It explicitly skips when that interpreter is absent. The isolated backend suite skips the PostgreSQL test unless `TEST_DATABASE_URL` is set; the Compose test service sets it automatically.
+The recorded verification includes:
 
-Tests cover turn order, blinds, legal actions, minimum raises, short/cumulative all-ins, all-in runouts, showdown, side pots, split pots, uncalled wagers, invalid transcripts, idempotent saves, HTTP errors, real SQL persistence, and browser save/reload behavior. See [the recorded results](docs/verification.md).
+- 23 backend tests with PostgreSQL enabled.
+- 9 frontend unit and cross-language contract tests, including 250 seeded transcript replays through Python/PokerKit.
+- 4 Playwright tests covering real API save/reload, all-in settlement, retry after a failed save, and mobile layout.
+- Ruff, TypeScript, Prettier, Docker Compose, and API smoke checks.
 
-## API
+See [docs/verification.md](docs/verification.md) for the detailed verification record and [docs/architecture.md](docs/architecture.md) for implementation decisions.
 
-| Method | Resource | Behavior |
-| --- | --- | --- |
-| GET | `/health` | Readiness, including a database query |
-| GET | `/api/hands?limit=50&offset=0` | Newest completed hands first; limit 1–100 |
-| GET | `/api/hands/{uuid}` | One hand; 404 when absent |
-| POST | `/api/hands` | Validate, settle, and persist a completed hand; 201 + Location |
+## Repository layout
 
-The POST body contains `id`, six `starting_stacks`, six pairs of `hole_cards`, five reserved `board` cards, and ordered `actions`. An action has a zero-based `player`, a `kind` (`fold`, `check`, `call`, `bet`, `raise`, `allin`), and an `amount` only for bet/raise. The server never accepts client-supplied winnings. Unrevealed board cards are omitted from saved history. Repeating an identical completed hand UUID returns the original hand with 200; reusing it for different content returns 409. Invalid hands return 422 and are never saved.
+```text
+.
+├── backend/
+│   ├── main.py
+│   ├── pyproject.toml
+│   ├── poetry.lock
+│   ├── src/poker/
+│   │   ├── api.py
+│   │   ├── engine.py
+│   │   ├── models.py
+│   │   ├── repository.py
+│   │   └── schemas.py
+│   └── tests/
+├── frontend/
+│   ├── src/
+│   │   ├── components/
+│   │   └── lib/
+│   ├── tests/
+│   └── e2e/
+├── docs/
+│   ├── architecture.md
+│   ├── verification.md
+│   └── ai/
+├── docker-compose.yml
+└── scripts/
+```
 
-## Scope and tradeoffs
-
-- This is a local hand simulator, with no accounts, multiplayer, real-money play, or tournaments.
-- Fixed positions make each independent reset easy to inspect. Dealer rotation and stack carryover between hands are outside this exercise.
-- Live hands are in browser memory. Refreshing discards an unfinished hand; completed hands are durable in PostgreSQL.
-- History stores immutable, validated dataclass snapshots in PostgreSQL JSONB. Raw SQL controls inserts, uniqueness, ordering, and pagination. This avoids many relational tables for data that is always read as a complete hand.
-- Client-side dealing is intentional for the required browser simulation. The server validates card uniqueness and legality; it does not claim to verify randomness or prevent a user from choosing their own valid cards.
-
-## Submission materials
-
-The exercise and solution are private application materials. The confirmed deadline is **Wednesday, October 7, 2026**. AI use is recorded in [docs/ai/README.md](docs/ai/README.md). Review the walkthrough and conversation record before submitting; the exercise expects the applicant to understand the implementation.
-
-To produce a ZIP containing the complete local Git repository and source, excluding dependencies, generated builds, and test reports:
+Generated dependencies, build output, test reports, and virtual environments are excluded from the submission archive. Rebuild the archive with:
 
 ```bash
 python3 scripts/package_submission.py
 ```
 
-No email is sent and no repository is published by this project.
+## AI-use disclosure
+
+AI assistance was used throughout design, implementation, testing, and documentation. The repository includes the visible conversation export and a tool/model disclosure in [docs/ai/](docs/ai/). The implementation, tests, and verification results should be reviewed by the applicant before submission.
+
+## Scope
+
+This is a local hand simulator. It does not include accounts, multiplayer networking, real-money play, tournaments, authentication, or authorization. Completed hands are durable in PostgreSQL; an unfinished browser hand is intentionally held in memory.
