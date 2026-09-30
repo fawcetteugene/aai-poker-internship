@@ -1,0 +1,33 @@
+[tool.poetry]
+name = "aai-poker"
+version = "0.1.0"
+description = "Six-player Texas Hold'em hand validation and persistence"
+authors = ["Fawcett Simiyu"]
+packages = [{include = "poker", from = "src"}]
+
+[tool.poetry.dependencies]
+python = "^3.12"
+fastapi = ">=0.115,<1.0"
+uvicorn = {version = ">=0.34,<1.0", extras = ["standard"]}
+psycopg = {version = ">=3.2,<4", extras = ["binary", "pool"]}
+pokerkit = "0.7.6"
+
+[tool.poetry.group.dev.dependencies]
+pytest = ">=8,<10"
+httpx = ">=0.28,<1"
+ruff = ">=0.11,<1"
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+
+[tool.ruff]
+line-length = 79
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
